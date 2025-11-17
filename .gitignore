@@ -1,0 +1,6 @@
+env
+*.env
+gcp_credentials.json
+*.ipynb
+.ipynb_checkpoints
+__pycache__/
