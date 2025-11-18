@@ -1,20 +1,7 @@
-from discogs_tool import search_album, get_release_info, pick_best_match
-from gsheets_tool import (
+from tools.discogs_API_functions import format_cd_info, search_album, get_release_info, pick_best_match
+from tools.gsheets_API_functions import (
     init_gsheets_client, open_or_create_sheet, get_or_create_worksheet, append_cd_metadata, is_duplicate, search_collection
 ) 
-
-# Helper function
-def format_cd_info(cd_info: dict) -> str:
-    '''
-    Format CD information into a readable string.
-    '''
-    title = cd_info.get("title", "Unknown Title")
-    artist = cd_info.get("artist", "Unknown Artist")
-    year = cd_info.get("year", "Unknown Year")
-    formats = cd_info.get("formats", [])
-    format_str = ', '.join(formats) if formats else "Unknown Format"
-    return f"'{artist} ({year}) - {title} (Format: {format_str})'"
-
 
 
 def choose_release(releases):
@@ -36,8 +23,18 @@ def choose_release(releases):
 
 def add_cd_to_sheets(query: str, auto_confirm: bool = False):
     """
-    Search Discogs for the album and write the first match into Google Sheets.
-    Very simple pipeline.
+    Searches Discogs for an album and adds the first or selected match to a Google Sheets collection.
+    This function performs a complete workflow: searches Discogs for albums matching the query,
+    allows user selection (or auto-selects if specified), checks for duplicates in the existing
+    collection, and appends the album metadata to a Google Sheets worksheet.
+    Args:
+        query (str): The search query for the album (e.g., artist name, album title, or both).
+        auto_confirm (bool, optional): If True, automatically selects the best match without 
+                                     user interaction. If False, prompts user to choose from 
+                                     search results. Defaults to False.
+    Returns:
+        None: This function doesn't return a value but prints status messages and may prompt 
+              for user input during execution.   
     """
 
     # Step 1: Search & select release

@@ -20,6 +20,7 @@ def init_gsheets_client(key_path="gcp_credentials.json"):
     client = gspread.authorize(creds)
     return client
 
+
 def open_or_create_sheet(client, sheet_name):
     '''
     Opens an existing sheet or creates a new one in the specified Google Drive folder.

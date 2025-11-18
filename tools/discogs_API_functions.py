@@ -37,6 +37,18 @@ def similarity(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
 
+def format_cd_info(cd_info: dict) -> str:
+    '''
+    Format CD information into a readable string.
+    '''
+    title = cd_info.get("title", "Unknown Title")
+    artist = cd_info.get("artist", "Unknown Artist")
+    year = cd_info.get("year", "Unknown Year")
+    formats = cd_info.get("formats", [])
+    format_str = ', '.join(formats) if formats else "Unknown Format"
+    return f"'{artist} ({year}) - {title} (Format: {format_str})'"
+
+
 # ----------------------------
 # Low-level Discogs functions
 # ----------------------------
