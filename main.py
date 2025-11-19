@@ -1,4 +1,4 @@
-from agents.cd_agent import cd_agent
+from music_agent.cd_agent import cd_agent
 
 def main():
     print("CD Agent CLI")

@@ -12,6 +12,9 @@ def add_cd_to_sheets_long_running(query: str, auto_confirm: bool = False):
     """
     Long-running version of add_cd_to_sheets.
     Step 1: Search Discogs and ask the user to pick a release.
+    args:
+        query: The search query for the album.
+        auto_confirm: If True, auto-select the best match without user approval.
     """
     # Create a ticket for storing state
     ticket = str(uuid.uuid4())
