@@ -1,8 +1,15 @@
+
 from google.adk.agents import LlmAgent
 from google.adk.tools import FunctionTool
 from google.adk.tools import LongRunningFunctionTool
-from tools.add_cd_to_sheets_tool import add_cd_to_sheets_long_running, resume_add_cd_to_sheets
-from tools.check_collection_for_cd_tool import check_collection_for_cd
+from google.adk.tools.agent_tool import AgentTool
+
+from . import prompt
+from .tools.add_cd_to_sheets_tool import add_cd_to_sheets_long_running, resume_add_cd_to_sheets
+from .tools.check_collection_for_cd_tool import check_collection_for_cd
+
+MODEL = "gemini-2.5-flash" # "gemini-2.5-pro"
+
 
 add_cd_to_sheets_tool = LongRunningFunctionTool(
     func=add_cd_to_sheets_long_running,
@@ -19,18 +26,21 @@ resume_add_cd_to_sheets_tool = LongRunningFunctionTool(
 
 cd_agent = LlmAgent(
     name='cd_agent',
-    model='gemini-2.5-flash',
-    description='An agent for managing CD metadata via Discogs and Google Sheets.',
-    instruction=(
-        "You are a CD collection assistant. "
-        "You can search Discogs, add CD metadata into Google Sheets, "
-        "and check whether an album is already in the collection. "
-        "Use tools when needed."
-    ),
+    model=MODEL,
+    description=(
+        "Search CD information via web search and manage CD metadata "
+        "Help create and maintain a CD collection "
+        "Managing CD collection metadata via Discogs and Google Sheets."
+        "Provide music recommendations from CD collection."
+     ),
+    instruction=prompt.CD_COORDINATOR_PROMPT,
+    output_key="target_cd",
     tools=[
-        add_cd_to_sheets_tool,
-        resume_add_cd_to_sheets_tool,
-        check_collection_for_cd()
+        # TODO
+        AgentTool(agent="cd_websearch_agent"),
+        # add_cd_to_sheets_tool,
+        # resume_add_cd_to_sheets_tool,
+        # check_collection_for_cd()
     ]
 )
 

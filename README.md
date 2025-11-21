@@ -22,3 +22,39 @@ Further extensions (advanced metadata enrichment, automation workflows, analytic
 ## Status
 
 Initial development — focusing on adding items to the collection and searching through them.
+
+## **Project Structure**
+
+Root layout (important files and folders):
+
+```
+.
+├── config/           # optional config files (currently empty)
+├── data/             # project data (empty)
+├── main.py           # top-level launcher / demo
+├── music_agent/      # agent code and tools
+│   ├── __init__.py
+│   ├── cd_agent.py
+│   ├── prompt.py
+│   ├── discogs_ingest_CLI.py
+│   ├── sub_agents/  # sub-agents tools
+│   │   ├── cd_info_summary_agent/
+│   │   └── cd_search_agent/
+│   └── tools/
+│       ├── __init__.py
+│       ├── add_cd_to_sheets_tool.py
+│       ├── check_collection_for_cd_tool.py
+│       ├── discogs_API_functions.py
+│       ├── discogs_ingest_CLI.py
+│       └── gsheets_API_functions.py
+├── README.md
+└── tests/             # unit/integration tests (currently empty)
+
+```
+
+Notes:
+- The `music_agent` package contains the agent definition and the small tools that perform Discogs lookups and Google Sheets writes.
+- `env/` is a checked-in Conda environment in this repository — activate it before running code: `eval "$(conda shell.bash hook)" && conda activate ./env`.
+- Credentials: `gcp_credentials.json` (service account) and any Discogs token should be added to the environment or `.env` file before running scripts that access external APIs.
+
+If you'd like, I can expand this tree to include more files, remove environment artifacts from the repository, or reorganize the code into an `agents/` package + `tools/` directory for clarity.
