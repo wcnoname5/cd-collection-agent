@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>CD Collection Agent</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            border: 1px solid #ccc;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+
+        input {
+            padding: 8px;
+            margin-right: 10px;
+        }
+
+        #results {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+
+        #discogsResults {
+            margin-top: 10px;
+        }
+
+        .search-result {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .search-result-info {
+            flex: 1;
+        }
+
+        .search-result-title {
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .search-result-details {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .add-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .add-btn:hover {
+            background-color: #45a049;
+        }
+
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>CD Collection Agent</h1>
+    <div class="container">
+
+        <div class="card">
+            <h2>Add New CD</h2>
+            <input type="text" id="title" placeholder="Title">
+            <input type="text" id="artist" placeholder="Artist">
+            <input type="number" id="year" placeholder="Year">
+            <button onclick="addCD()">Add CD</button>
+        </div>
+
+        <div class="card">
+            <h2>Get CD by ID</h2>
+            <input type="number" id="cdId" placeholder="CD ID">
+            <button onclick="getCD()">Get CD</button>
+        </div>
+
+        <div class="card">
+            <h2>Search Discogs</h2>
+            <input type="text" id="searchQuery" placeholder="Search for album or artist">
+            <button onclick="searchDiscogs()">Search</button>
+            <div id="discogsResults"></div>
+        </div>
+
+        <div class="card">
+            <h2>List All CDs</h2>
+            <button onclick="listCDs()">List All CDs</button>
+        </div>
+
+        <div id="results">Results will appear here...</div>
+    </div>
+
+    <script>
+        async function addCD() {
+            const title = document.getElementById('title').value;
+            const artist = document.getElementById('artist').value;
+            const year = document.getElementById('year').value;
+
+            const response = await fetch('/cds/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, artist, year: parseInt(year) })
+            });
+            const data = await response.json();
+            document.getElementById('results').textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function getCD() {
+            const id = document.getElementById('cdId').value;
+            const response = await fetch(`/cds/${id}`);
+            const data = await response.json();
+            document.getElementById('results').textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function listCDs() {
+            const response = await fetch('/cds/');
+            const data = await response.json();
+            document.getElementById('results').textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function searchDiscogs() {
+            const query = document.getElementById('searchQuery').value;
+            if (!query) {
+                alert('Please enter a search query');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('discogsResults');
+            resultsDiv.innerHTML = '<p class="loading">Searching Discogs...</p>';
+
+            try {
+                const response = await fetch(`/discogs/search?query=${encodeURIComponent(query)}`);
+                const results = await response.json();
+
+                if (results.length === 0) {
+                    resultsDiv.innerHTML = '<p>No results found.</p>';
+                    return;
+                }
+
+                // Display results
+                let html = '';
+                results.forEach(result => {
+                    const formats = Array.isArray(result.formats) ? result.formats.join(', ') : '';
+                    html += `
+                        <div class="search-result">
+                            <div class="search-result-info">
+                                <div class="search-result-title">${result.artist} - ${result.title}</div>
+                                <div class="search-result-details">
+                                    ${result.year || 'N/A'} | ${result.country || 'N/A'} | ${formats}
+                                </div>
+                            </div>
+                            <button class="add-btn" onclick="addFromDiscogs(${result.id})">Add to Collection</button>
+                        </div>
+                    `;
+                });
+                resultsDiv.innerHTML = html;
+            } catch (error) {
+                resultsDiv.innerHTML = '<p>Error searching Discogs: ' + error.message + '</p>';
+            }
+        }
+
+        async function addFromDiscogs(releaseId) {
+            try {
+                // First, get detailed release info
+                const releaseResponse = await fetch(`/discogs/release/${releaseId}`);
+                const releaseInfo = await releaseResponse.json();
+
+                // Prepare CD data for insertion
+                const cdData = {
+                    title: releaseInfo.title,
+                    artist: releaseInfo.artist,
+                    year: releaseInfo.year,
+                    genre: releaseInfo.genres,
+                    style: releaseInfo.styles,
+                    tracklist: releaseInfo.tracklist,
+                    labels: releaseInfo.labels,
+                    formats: releaseInfo.formats,
+                    images: releaseInfo.images,
+                    discogs_id: String(releaseInfo.discogs_id)
+                };
+
+                // Add to collection
+                const response = await fetch('/cds/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cdData)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('results').textContent = 'Added to collection:\n' + JSON.stringify(data, null, 2);
+                    alert(`Successfully added "${cdData.title}" to your collection!`);
+                } else {
+                    const error = await response.json();
+                    alert('Error adding to collection: ' + JSON.stringify(error));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+
+</html>

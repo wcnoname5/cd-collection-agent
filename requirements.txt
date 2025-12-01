@@ -5,3 +5,5 @@ pydantic
 chromadb
 langchain
 langgraph
+discogs-client
+python-dotenv

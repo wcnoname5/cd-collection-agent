@@ -7,10 +7,10 @@ class CDBase(BaseModel):
     year: Optional[int] = None
     genre: Optional[str] = None
     style: Optional[str] = None
-    tracklist: Optional[str] = None
-    labels: Optional[str] = None
-    formats: Optional[str] = None
-    images: Optional[str] = None
+    tracklist: Optional[list[str]] = None
+    labels: Optional[list[str]] = None
+    formats: Optional[list[str]] = None
+    images: Optional[list[str]] = None
     discogs_id: Optional[str] = None
 
 class CDCreate(CDBase):

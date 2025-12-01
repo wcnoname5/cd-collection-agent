@@ -3,7 +3,8 @@
 A FastAPI-based agent for managing CD collections and providing recommendations.
 
 
-Quick Start
+## Quick Start
+
 ```bash
 uv sync
 uv run uvicorn app.main:app --reload

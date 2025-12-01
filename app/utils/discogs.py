@@ -12,11 +12,11 @@ import discogs_client
 # Config: replace with your token
 # ----------------------------
 load_dotenv()
-DISCOGS_USER_TOKEN = os.getenv("DISCOGS_USER_TOKEN")
+DISCOGS_TOKEN = os.getenv("DISCOGS_TOKEN")
 USER_AGENT = "CDCollectionAgent/1.0"
 
 # Initialize Discogs client
-d = discogs_client.Client(USER_AGENT, user_token=DISCOGS_USER_TOKEN)
+d = discogs_client.Client(USER_AGENT, user_token=DISCOGS_TOKEN)
 
 
 # ----------------------------
