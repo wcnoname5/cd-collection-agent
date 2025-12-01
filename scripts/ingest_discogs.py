@@ -1,3 +1,5 @@
+# TODO: Implement Discogs API 
+
 from discogs_tool import search_album, get_release_info
 from gsheets_tool import (
     init_gsheets_client, open_or_create_sheet, get_or_create_worksheet, append_cd_metadata
