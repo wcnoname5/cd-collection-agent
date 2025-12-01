@@ -1,0 +1,2 @@
+class CDService:
+    pass
