@@ -1,5 +1,6 @@
-# from sqlalchemy.ext.declarative import declarative_base
-
+'''
+Setup Database models and format for the application.
+'''
 # Base = declarative_base()
 from sqlalchemy import Column, Integer, String, JSON
 from .database import Base

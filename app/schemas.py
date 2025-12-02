@@ -17,6 +17,6 @@ class CDCreate(CDBase):
     pass
 
 class CD(CDBase):
-    id: int
+    id: int # as primary key
     class Config:
-        orm_mode = True # from_attributes
+        from_attributes = True # from_attributes

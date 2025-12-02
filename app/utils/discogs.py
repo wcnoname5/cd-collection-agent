@@ -322,8 +322,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # ensure token is set
-    if DISCOGS_USER_TOKEN == "YOUR_DISCOGS_PERSONAL_ACCESS_TOKEN":
-        print("Please set DISCOGS_USER_TOKEN in this file before running.")
+    if DISCOGS_TOKEN == "YOUR_DISCOGS_PERSONAL_ACCESS_TOKEN":
+        print("Please set DISCOGS_TOKEN in this file before running.")
         raise SystemExit(1)
 
     result = album_lookup_agent(args.query, limit=args.limit, require_cd=not args.no_cd, auto_confirm=args.auto)
