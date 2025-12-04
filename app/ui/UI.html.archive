@@ -103,9 +103,14 @@
         </div>
 
         <div class="card">
-            <h2>Get CD by ID</h2>
-            <input type="number" id="cdId" placeholder="CD ID">
-            <button onclick="getCD()">Get CD</button>
+            <h2>Search CD</h2>
+            <select id="searchType" onchange="changeSearchType()">
+                <option value="id">ID</option>
+                <option value="title">Title</option>
+                <option value="artist">Artist</option>
+            </select>
+            <input type="number" id="searchInput" placeholder="Enter CD ID">
+            <button onclick="performSearch()">Search</button>
         </div>
 
         <div class="card">
@@ -121,6 +126,8 @@
         </div>
 
         <div id="results">Results will appear here...</div>
+        <button onclick="document.getElementById('results').textContent = 'Results will appear here...';">Clear
+            Results</button>
     </div>
 
     <script>
@@ -139,10 +146,52 @@
         }
 
         async function getCD() {
-            const id = document.getElementById('cdId').value;
+            const id = document.getElementById('searchInput').value;
             const response = await fetch(`/cds/${id}`);
             const data = await response.json();
             document.getElementById('results').textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function getCDTitle() {
+            const title = document.getElementById('searchInput').value;
+            const response = await fetch(`/cds/?title=${encodeURIComponent(title)}`);
+            const data = await response.json();
+            document.getElementById('results').textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function getArtist() {
+            const artist = document.getElementById('searchInput').value;
+            const response = await fetch(`/cds/?artist=${encodeURIComponent(artist)}`);
+            const data = await response.json();
+            document.getElementById('results').textContent = JSON.stringify(data, null, 2);
+        }
+
+        function changeSearchType() {
+            const searchType = document.getElementById('searchType').value;
+            const searchInput = document.getElementById('searchInput');
+
+            if (searchType === 'id') {
+                searchInput.type = 'number';
+                searchInput.placeholder = 'Enter CD ID';
+            } else if (searchType === 'title') {
+                searchInput.type = 'text';
+                searchInput.placeholder = 'Enter CD Title';
+            } else if (searchType === 'artist') {
+                searchInput.type = 'text';
+                searchInput.placeholder = 'Enter Artist Name';
+            }
+        }
+
+        function performSearch() {
+            const searchType = document.getElementById('searchType').value;
+
+            if (searchType === 'id') {
+                getCD();
+            } else if (searchType === 'title') {
+                getCDTitle();
+            } else if (searchType === 'artist') {
+                getArtist();
+            }
         }
 
         async function listCDs() {

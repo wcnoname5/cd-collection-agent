@@ -27,6 +27,18 @@ def create_cd(cd: schemas.CDCreate, db: Session = Depends(get_db)):
 def read_cd(cd_id: int, db: Session = Depends(get_db)):
     return db.query(models.CD).filter(models.CD.id == cd_id).first()
 
+# get CD by its title
+@router.get("/{cd_title}", response_model=schemas.CD)
+def read_cd(cd_title: str, db: Session = Depends(get_db)):
+    cd_title = cd_title.lower()
+    return db.query(models.CD).filter(models.CD.title.lower() == cd_title).first()
+
+# get collections by artist
+@router.get("/{artist}", response_model=schemas.CD)
+def read_cd(artist: str, db: Session = Depends(get_db)):
+    artist = artist.lower()
+    return db.query(models.CD).filter(models.CD.artist.lower() == artist)
+
 # get all CDs
 @router.get("/", response_model=list[schemas.CD])
 def read_all_cds(db: Session = Depends(get_db)):

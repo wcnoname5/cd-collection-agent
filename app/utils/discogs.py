@@ -40,12 +40,47 @@ def similarity(a: str, b: str) -> float:
 # ----------------------------
 # Low-level Discogs functions
 # ----------------------------
-def search_album(query: str, limit: int = 5) -> List[Dict[str, Any]]:
+def search_album(
+    query: str, 
+    limit: int = 5,
+    release_format: Optional[str] = None,
+    country: Optional[str] = None,
+    year: Optional[int] = None
+) -> List[Dict[str, Any]]:
     """
     Search Discogs for releases matching `query`.
+    Optional filters: release_format, country, year
     Returns a list of candidate dicts (limited).
+    
+    Args:
+        query: Search query string
+        limit: Maximum number of results to return
+        release_format: Format filter (e.g., 'CD', 'Vinyl', 'Cassette')
+        country: Country filter (e.g., 'US', 'UK', 'Japan')
+        year: Year filter (e.g., 1973, 2020)
     """
-    results = d.search(query, type='release')  # search releases (not masters)
+    # Build search parameters
+    search_params = {
+        'type': 'release'  # search releases (not masters)
+    }
+    
+    # Add optional filters if provided
+    if release_format:
+        search_params['format'] = release_format
+    if country:
+        search_params['country'] = country
+    if year:
+        search_params['year'] = str(year)
+    
+    # Perform search with filters
+    print(f"DEBUG: d.search called with query='{query}' and params={search_params}")
+    try:
+        results = d.search(query, **search_params)
+        print(f"DEBUG: d.search returned object: {type(results)}")
+    except Exception as e:
+        print(f"DEBUG: Error in d.search: {e}")
+        raise e
+    
     candidates = []
     for i, release in enumerate(results):
         if i >= limit:
@@ -74,6 +109,8 @@ def search_album(query: str, limit: int = 5) -> List[Dict[str, Any]]:
                 "country": getattr(release, "country", None),
                 "id": getattr(release, "id", None),
                 "formats": formats,
+                "url": getattr(release, "url", None),  # Discogs URL
+                "images": getattr(release, "images", None),
                 # keep raw object lightly for later details if needed
                 "_raw_obj": release,
             })
