@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-import sys
 
 
 def import_direct(path: Path) -> int:

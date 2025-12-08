@@ -8,7 +8,7 @@ Purpose:
 4. Provide a simple CLI to query the vector store.
 
 Usage:
-    python chroma_diag.py
+    python tests/chroma_diag.py
     > jazz piano
     > experimental rock
     > quit

@@ -1,6 +1,8 @@
 """
 CD Collection Agent - Streamlit Application
 A modern UI for managing your CD collection with Discogs integration
+usage:
+    streamlit run streamlit_app.py  
 """
 import streamlit as st
 from sqlalchemy.orm import Session
@@ -8,6 +10,7 @@ from app.db.database import SessionLocal, Base, engine
 from app.services import cd_service
 from app import schemas
 from app.utils.discogs import search_album, get_release_info
+from app.agents.workflow import workflow
 import json
 
 # Initialize database
@@ -66,7 +69,7 @@ st.title("💿 CD Collection Agent")
 st.markdown("---")
 
 # Create tabs for different sections
-tab1, tab2, tab3, tab4 = st.tabs(["➕ Add CD", "🔍 Search", "🌐 Discogs Search", "📋 View All"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["➕ Add CD", "🔍 Search", "🌐 Discogs Search", "📋 View All", "Chat"]) 
 
 # ===== TAB 1: Add New CD =====
 with tab1:
@@ -338,6 +341,17 @@ with tab4:
     except Exception as e:
         st.error(f"Error loading CDs: {str(e)}")
 
+#===== TAB 5: Chat with LLM =====
+with tab5:
+    st.title("Talk to the CD Collection Agent!")
+
+    user_input = st.text_input("Enter your message:")
+
+    if st.button("Send"):
+        if user_input.strip():
+            result = workflow.invoke({"user_input": user_input})
+            st.markdown("### Agent Response:")
+            st.write(result["model_output"])
 # Footer
 st.markdown("---")
 st.caption("💿 CD Collection Agent - Built with Streamlit")

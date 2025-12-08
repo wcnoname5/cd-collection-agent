@@ -33,6 +33,7 @@ The application will open in your browser at `http://localhost:8501`
 
 - `streamlit_app.py` - Main Streamlit application
 - `app/db/` - Database models and configuration
+- `app/routers/` - Currently archieved, can be build later when flip back into FastAPI
 - `app/services/` - Business logic and CRUD operations
 - `app/utils/` - Utility functions (Discogs integration, etc.)
 - `data/` - SQLite database storage
