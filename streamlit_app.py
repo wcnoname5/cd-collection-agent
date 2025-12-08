@@ -11,7 +11,15 @@ from app.services import cd_service
 from app import schemas
 from app.utils.discogs import search_album, get_release_info
 from app.agents.workflow import workflow
+from app.services.spotify_service import SpotifyService
 import json
+import os
+import uuid
+import secrets
+import pandas as pd
+
+# Constants
+TOKEN_PATH = "data/spotify_tokens.json"
 
 # Initialize database
 Base.metadata.create_all(bind=engine)
@@ -64,12 +72,31 @@ def format_cd_display(cd):
     }
 
 
+def parse_spotify_items(data):
+    """Parse Spotify recently played items into a DataFrame"""
+    items = data.get('items', [])
+    records = []
+    for item in items:
+        track = item.get('track', {})
+        record = {
+            'Artist': ', '.join([a.get('name', 'Unknown') for a in track.get('artists', [])]),
+            'Track': track.get('name', 'Unknown'),
+            'Duration': f"{int(track.get('duration_ms', 0) / 60000)}:{int((track.get('duration_ms', 0) / 1000) % 60):02d}",
+            'Played At': item.get('played_at', 'Unknown'),
+            'Album': track.get('album', {}).get('name', 'Unknown'),
+            'Track Number': track.get('track_number', 0),
+            'Album Year': track.get('album', {}).get('release_date', 'Unknown')[:4]
+        }
+        records.append(record)
+    return pd.DataFrame(records)
+
+
 # Main title
 st.title("💿 CD Collection Agent")
 st.markdown("---")
 
 # Create tabs for different sections
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["➕ Add CD", "🔍 Search", "🌐 Discogs Search", "📋 View All", "Chat"]) 
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["➕ Add CD", "🔍 Search", "🌐 Discogs Search", "📋 View All", "Chat", "🎵 Spotify"]) 
 
 # ===== TAB 1: Add New CD =====
 with tab1:
@@ -352,6 +379,123 @@ with tab5:
             result = workflow.invoke({"user_input": user_input})
             st.markdown("### Agent Response:")
             st.write(result["model_output"])
+
+# ===== TAB 6: Spotify =====
+with tab6:
+    st.header("🎵 Spotify Integration")
+    
+    client_id = os.getenv("SPOTIFY_CLIENT_ID")
+    redirect = os.getenv("SPOTIFY_REDIRECT_URI")
+
+    if not client_id or not redirect:
+        st.warning("Spotify credentials not configured.")
+        st.info("""
+        Please set these environment variables:
+        - SPOTIFY_CLIENT_ID
+        - SPOTIFY_REDIRECT_URI (should be: http://127.0.0.1:8501/ or http://localhost:8501/)
+        
+        **Important:** The SPOTIFY_REDIRECT_URI in your Spotify app settings MUST match exactly what you set here.
+        Go to https://developer.spotify.com/dashboard and update your app's redirect URI.
+        """)
+    else:
+        # Ensure data directory exists
+        os.makedirs("data", exist_ok=True)
+        
+        service = SpotifyService(client_id, redirect, TOKEN_PATH)
+        
+        verifier_file = "data/.code_verifier"
+
+        # Display current redirect URI for debugging
+        with st.expander("🔧 Debug Info"):
+            st.code(f"Redirect URI: {redirect}", language="text")
+            st.code(f"Current URL: {st.query_params}", language="text")
+
+        # Generate code verifier once and store it persistently
+        if not os.path.exists(verifier_file):
+            # PKCE requires code verifier to be between 43 and 128 characters
+            # secrets.token_urlsafe(64) generates a string of approx 85 chars
+            code_verifier = secrets.token_urlsafe(64)
+            with open(verifier_file, "w") as f:
+                f.write(code_verifier)
+            st.session_state.code_verifier = code_verifier
+        else:
+            # Load from file
+            with open(verifier_file, "r") as f:
+                saved_verifier = f.read().strip()
+
+            # Auto-fix: if the saved verifier is too short, regenerate it
+            if len(saved_verifier) < 43:
+                code_verifier = secrets.token_urlsafe(64)
+                with open(verifier_file, "w") as f:
+                    f.write(code_verifier)
+                st.session_state.code_verifier = code_verifier
+                # Clear any existing query params to avoid processing the old code with new verifier
+                st.query_params.clear() 
+            else:
+                st.session_state.code_verifier = saved_verifier
+
+        auth_url = service.build_auth_url(st.session_state.code_verifier)
+        st.markdown(f"[🔐 Login with Spotify]({auth_url})")
+        st.caption("Click the link above to authenticate with Spotify")
+
+        code = st.query_params.get("code")
+        if code:
+            st.info("Processing Spotify callback...")
+            try:
+                # Ensure we have the correct code verifier
+                if not os.path.exists(verifier_file):
+                    st.error("❌ Code verifier not found. Please click the login link again.")
+                else:
+                    with open(verifier_file, "r") as f:
+                        code_verifier = f.read().strip()
+                    
+                    if not code_verifier:
+                        st.error("❌ Code verifier is empty. Please click the login link again.")
+                    else:
+                        st.info(f"Using code verifier of length: {len(code_verifier)}")
+                        tokens = service.exchange_code_for_tokens(code, code_verifier)
+                        
+                        # Check if we got valid tokens
+                        if tokens and "access_token" in tokens:
+                            st.success("✅ Spotify authenticated successfully!")
+                            st.info("You can now load your Spotify history below.")
+                            # Clean up the code from URL by clearing query params
+                            st.query_params.clear()
+                            # Clean up stored verifier
+                            try:
+                                os.remove(verifier_file)
+                            except:
+                                pass
+                        else:
+                            st.error(f"❌ Authentication failed: {tokens}")
+                            st.info("Please try logging in again.")
+            except Exception as e:
+                st.error(f"❌ Authentication failed: {str(e)}")
+                st.info("""
+                **Troubleshooting:**
+                1. Make sure SPOTIFY_REDIRECT_URI matches exactly in your Spotify app settings
+                2. Check that your Spotify Client ID and Secret are correct
+                3. Try logging in again
+                """)
+
+        if st.button("Load recent history"):
+            try:
+                data = service.get_recent_history(limit=50)
+                if not data or 'items' not in data:
+                    st.warning("No recent history data available.")
+                else:
+                    df = parse_spotify_items(data)
+                    if len(df) > 0:
+                        st.dataframe(df, use_container_width=True)
+                        df.to_parquet("data/spotify_history.parquet")
+                        st.success(f"✅ Loaded {len(df)} tracks from Spotify history")
+                    else:
+                        st.info("No tracks found in recent history.")
+            except Exception as e:
+                st.error(f"Error loading Spotify history: {str(e)}")
+                st.info("Make sure you've authenticated and have recent listening history.")
+
+
 # Footer
 st.markdown("---")
 st.caption("💿 CD Collection Agent - Built with Streamlit")

@@ -1,5 +1,8 @@
 env
 *.env
 *.db
+.code_verifier
+data/spotify_tokens.json
+raw/spotify_history.parquet
 chroma/
 __pycache__/
