@@ -1,6 +1,10 @@
 env
 *.env
 gcp_credentials.json
+spotify_tokens.json
+.code_verifier
+cds.db
+data/
 *.ipynb
 .ipynb_checkpoints
 __pycache__/
