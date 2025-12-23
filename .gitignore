@@ -3,6 +3,7 @@ env
 *.db
 .code_verifier
 data/spotify_tokens.json
+data/
 raw/spotify_history.parquet
 chroma/
 __pycache__/

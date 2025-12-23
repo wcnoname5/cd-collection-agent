@@ -7,16 +7,33 @@ usage:
 import streamlit as st
 from sqlalchemy.orm import Session
 from app.db.database import SessionLocal, Base, engine
-from app.services import cd_service
 from app import schemas
-from app.utils.discogs import search_album, get_release_info
-from app.agents.workflow import workflow
 from app.services.spotify_service import SpotifyService
+
+# ETL imports
+from etl.importer import import_excel
+from etl.normalizer import normalize_record, validate_records
+from etl.api_fetcher import search_discogs, fetch_discogs_batch
+from etl.merge import merge_records
+from etl.queries import (
+    search_cds_by_title,
+    search_cds_by_artist,
+    get_cd_by_id,
+    get_all_cds,
+    filter_cds,
+)
+from app.db.manager import insert_cds_batch
+
 import json
 import os
 import uuid
 import secrets
 import pandas as pd
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Constants
 TOKEN_PATH = "data/spotify_tokens.json"
@@ -96,7 +113,7 @@ st.title("💿 CD Collection Agent")
 st.markdown("---")
 
 # Create tabs for different sections
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["➕ Add CD", "🔍 Search", "🌐 Discogs Search", "📋 View All", "Chat", "🎵 Spotify"]) 
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["➕ Add CD", "🔍 Search", "🌐 Discogs Search", "📋 View All", "🎵 Spotify"]) 
 
 # ===== TAB 1: Add New CD =====
 with tab1:
@@ -121,7 +138,7 @@ with tab1:
                 st.error("Please provide both Title and Artist")
             else:
                 try:
-                    db = get_db()
+                    # Normalize and create CD record
                     cd_data = schemas.CDCreate(
                         title=title,
                         artist=artist,
@@ -129,8 +146,16 @@ with tab1:
                         genre=genre if genre else None,
                         style=style if style else None
                     )
-                    new_cd = cd_service.create_cd(db, cd_data)
-                    st.success(f"✅ Successfully added '{new_cd.title}' by {new_cd.artist} (ID: {new_cd.id})")
+                    
+                    # Insert to DB
+                    db = get_db()
+                    inserted = insert_cds_batch(db, [cd_data.dict()])
+                    
+                    if inserted > 0:
+                        st.success(f"✅ Successfully added '{title}' by {artist}")
+                    else:
+                        st.error("Failed to add CD to collection")
+                    
                     db.close()
                 except Exception as e:
                     st.error(f"Error adding CD: {str(e)}")
@@ -166,7 +191,7 @@ with tab2:
         if search_button and search_value:
             try:
                 db = get_db()
-                cds = cd_service.search_cds_by_title(db, search_value)
+                cds = search_cds_by_title(db, search_value)
                 db.close()
                 
                 if cds:
@@ -186,7 +211,7 @@ with tab2:
         if search_button and search_value:
             try:
                 db = get_db()
-                cds = cd_service.search_cds_by_artist(db, search_value)
+                cds = search_cds_by_artist(db, search_value)
                 db.close()
                 
                 if cds:
@@ -236,18 +261,13 @@ with tab3:
     if discogs_search_button and discogs_query:
         with st.spinner("Searching Discogs..."):
             try:
-                # Prepare search parameters
-                search_params = {"query": discogs_query, "limit": 10}
+                # Parse query
+                parts = discogs_query.split(" ", 1)
+                artist = parts[0]
+                title = parts[1] if len(parts) > 1 else ""
                 
-                # Add optional filters only if they're set
-                if filter_format and filter_format != "Any":
-                    search_params["release_format"] = filter_format
-                if filter_country:
-                    search_params["country"] = filter_country
-                if filter_year != -1:  # -1 is the sentinel value for "not set"
-                    search_params["year"] = filter_year
-                
-                results = search_album(**search_params)
+                # Use ETL API fetcher
+                results = search_discogs(artist, title, limit=10)
                 st.session_state.discogs_results = results
                 
                 if not results:
@@ -263,62 +283,50 @@ with tab3:
 
         for idx, result in enumerate(results):
             with st.container():
-                # Create columns: image, info, button
-                col_img, col_info, col_btn = st.columns([1, 3, 1])
-
-                with col_img:
-                    # Display album cover image if available
-                    images = result.get('images', [])
-                    if images and len(images) > 0:
-                        # Get the first image (usually the cover)
-                        image_url = images[0].get("uri") if isinstance(images, list) else images.get("uri")
-                        st.image(image_url, width=100)
-                    else:
-                        # Placeholder if no image available
-                        st.write("🎵")
+                # Create columns: info, button
+                col_info, col_btn = st.columns([3, 1])
 
                 with col_info:
-                    url = result.get('url', '')
                     title_text = f"**{result.get('artist', 'Unknown')} - {result.get('title', 'Unknown')}**"
-                    if url:
-                        st.markdown(f"{title_text} | [View on Discogs]({url})")
-                    else:
-                        st.markdown(title_text)
+                    st.markdown(title_text)
+                    
                     details = f"{result.get('year', 'N/A')} | {result.get('country', 'N/A')}"
                     formats = result.get('formats', [])
                     if formats:
                         details += f" | {', '.join(formats) if isinstance(formats, list) else formats}"
                     st.caption(details)
+                    
+                    # Show genres/styles
+                    genres = result.get('genres', [])
+                    styles = result.get('styles', [])
+                    if genres or styles:
+                        genre_text = f"📚 {', '.join(genres + styles)}" if genres or styles else ""
+                        st.caption(genre_text)
 
                 with col_btn:
                     # Use unique key for each button
                     if st.button("Add to Collection", key=f"add_discogs_{idx}"):
                         try:
-                            # Get detailed release info
-                            release_id = result.get('id')
-                            with st.spinner("Fetching details..."):
-                                release_info = get_release_info(release_id)
-
-                            # Prepare CD data
+                            # Prepare CD data from Discogs result
                             cd_data = schemas.CDCreate(
-                                title=release_info.get('title'),
-                                artist=release_info.get('artist'),
-                                year=release_info.get('year'),
-                                genre=release_info.get('genres'),
-                                style=release_info.get('styles'),
-                                tracklist=release_info.get('tracklist'),
-                                labels=release_info.get('labels'),
-                                formats=release_info.get('formats'),
-                                images=release_info.get('images'),
-                                discogs_id=str(release_info.get('discogs_id'))
+                                title=result.get('title'),
+                                artist=result.get('artist'),
+                                year=result.get('year'),
+                                genre=" / ".join(result.get('genres', [])) if result.get('genres') else None,
+                                style=" / ".join(result.get('styles', [])) if result.get('styles') else None,
+                                formats=" / ".join(result.get('formats', [])) if result.get('formats') else None,
+                                discogs_id=str(result.get('id'))
                             )
 
                             # Add to database
                             db = get_db()
-                            new_cd = cd_service.create_cd(db, cd_data)
+                            inserted = insert_cds_batch(db, [cd_data.dict()])
                             db.close()
 
-                            st.success(f"✅ Added '{new_cd.title}' to collection!")
+                            if inserted > 0:
+                                st.success(f"✅ Added '{result.get('title')}' to collection!")
+                            else:
+                                st.error("Failed to add CD")
                         except Exception as e:
                             st.error(f"Error adding from Discogs: {str(e)}")
 
@@ -333,7 +341,7 @@ with tab4:
     
     try:
         db = get_db()
-        all_cds = cd_service.get_all_cds(db)
+        all_cds = get_all_cds(db)
         db.close()
         
         if all_cds:
@@ -355,33 +363,13 @@ with tab4:
                         st.write(f"**Style:** {cd.style if cd.style else 'N/A'}")
                         if cd.discogs_id:
                             st.write(f"**Discogs ID:** {cd.discogs_id}")
-                    
-                    # Show additional details if available
-                    if cd.tracklist:
-                        st.write("**Tracklist:**")
-                        st.json(cd.tracklist)
-                    if cd.formats:
-                        st.write("**Formats:**")
-                        st.json(cd.formats)
         else:
             st.warning("No CDs in collection yet. Add some CDs to get started!")
     except Exception as e:
         st.error(f"Error loading CDs: {str(e)}")
 
-#===== TAB 5: Chat with LLM =====
-with tab5:
-    st.title("Talk to the CD Collection Agent!")
-
-    user_input = st.text_input("Enter your message:")
-
-    if st.button("Send"):
-        if user_input.strip():
-            result = workflow.invoke({"user_input": user_input})
-            st.markdown("### Agent Response:")
-            st.write(result["model_output"])
-
 # ===== TAB 6: Spotify =====
-with tab6:
+with tab5:
     st.header("🎵 Spotify Integration")
     
     client_id = os.getenv("SPOTIFY_CLIENT_ID")
