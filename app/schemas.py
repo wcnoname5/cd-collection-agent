@@ -6,12 +6,12 @@ class CDBase(BaseModel):
     artist: str
     year: Optional[int] = None
     genre: Optional[str] = None
-    style: Optional[str] = None
+    styles: Optional[list[str]] = None
     tracklist: Optional[list[str]] = None
     labels: Optional[list[str]] = None
     formats: Optional[list[str]] = None
     images: Optional[list[str]] = None
-    discogs_id: Optional[str] = None
+    discogs_id: Optional[int] = None
 
 class CDCreate(CDBase):
     pass

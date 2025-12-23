@@ -44,10 +44,11 @@ def insert_cds_batch(db: Session, records: List[Dict[str, Any]]) -> int:
     for idx, record in enumerate(records):
         try:
             # Create Pydantic schema for validation
+            logger.info(f"Inserting record: {record}")
             cd_create = schemas.CDCreate(**record)
             
             # Create model instance
-            db_cd = CD(**cd_create.dict())
+            db_cd = CD(**cd_create.model_dump())
             db.add(db_cd)
             inserted_count += 1
             

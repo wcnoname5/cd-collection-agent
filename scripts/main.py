@@ -26,6 +26,7 @@ from etl.merge import merge_records
 from etl.queries import search_cds_by_artist, search_cds_by_title, get_all_cds, count_cds
 from app.db.database import SessionLocal
 from app.db.manager import insert_cds_batch
+from app.db.init_db import reset_db, clear_all_records
 
 # Set up logging
 logging.basicConfig(
@@ -153,13 +154,16 @@ def cmd_stats(args):
         if all_cds:
             # Group by artist
             artists = {}
-            for cd in all_cds:
+            max_items = args.max if args.max else 10
+            logger.info(f"View top {max_items} collections")
+            for i, cd in enumerate(all_cds, 1):
+                if i <= max_items:
+                    logger.info(f"{i}:  {cd.artist} - {cd.title} ({cd.year})")
                 if cd.artist not in artists:
                     artists[cd.artist] = 0
                 artists[cd.artist] += 1
             
             logger.info(f"Total artists: {len(artists)}")
-            
             # Top artists
             top_artists = sorted(artists.items(), key=lambda x: x[1], reverse=True)[:5]
             logger.info("Top 5 artists:")
@@ -174,6 +178,47 @@ def cmd_stats(args):
     
     finally:
         db.close()
+
+
+def cmd_reset(args):
+    """Reset or manage database"""
+    try:
+        if args.full:
+            logger.warning("⚠️  Full database reset requested")
+            confirm = input("This will delete all data. Type 'yes' to confirm: ")
+            if confirm.lower() != "yes":
+                logger.info("Reset cancelled")
+                return 0
+            reset_db()
+            logger.info("✅ Full reset complete")
+            return 0
+        
+        elif args.clear:
+            logger.warning("⚠️  Clearing all records")
+            confirm = input("This will delete all CD records. Type 'yes' to confirm: ")
+            if confirm.lower() != "yes":
+                logger.info("Clear cancelled")
+                return 0
+            deleted = clear_all_records()
+            logger.info(f"✅ Cleared {deleted} records")
+            return 0
+        
+        elif args.count:
+            db = SessionLocal()
+            try:
+                count = count_cds(db)
+                logger.info(f"📊 Database contains {count} CD record(s)")
+                return 0
+            finally:
+                db.close()
+        
+        else:
+            logger.error("Specify --full, --clear, or --count")
+            return 1
+    
+    except Exception as e:
+        logger.error(f"Reset error: {e}", exc_info=True)
+        return 1
 
 
 def main():
@@ -195,6 +240,11 @@ Examples:
   
   # Show stats
   python scripts/main.py stats
+  
+  # Reset database
+  python scripts/main.py reset --count
+  python scripts/main.py reset --clear
+  python scripts/main.py reset --full
         """
     )
     
@@ -228,7 +278,32 @@ Examples:
     
     # Stats command
     stats_parser = subparsers.add_parser("stats", help="Show collection statistics")
+    stats_parser.add_argument(
+        "--max",
+        type=int,
+        help="max items to show"
+    )
     stats_parser.set_defaults(func=cmd_stats)
+    
+    # Reset command
+    reset_parser = subparsers.add_parser("reset", help="Reset or manage database")
+    reset_group = reset_parser.add_mutually_exclusive_group()
+    reset_group.add_argument(
+        "--full",
+        action="store_true",
+        help="Full reset: drop and recreate all tables (requires confirmation)"
+    )
+    reset_group.add_argument(
+        "--clear",
+        action="store_true",
+        help="Clear all records but keep table structure (requires confirmation)"
+    )
+    reset_group.add_argument(
+        "--count",
+        action="store_true",
+        help="Show current record count"
+    )
+    reset_parser.set_defaults(func=cmd_reset)
     
     args = parser.parse_args()
     

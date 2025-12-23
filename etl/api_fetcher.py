@@ -49,7 +49,7 @@ def similarity(a: str, b: str) -> float:
     return SequenceMatcher(None, a_norm, b_norm).ratio()
 
 
-def search_discogs(artist: str, title: str, limit: int = 5) -> List[Dict[str, Any]]:
+def search_discogs(artist: str, title: str, format = 'CD', limit: int = 5) -> List[Dict[str, Any]]:
     """
     Search Discogs for album releases.
     
@@ -75,7 +75,7 @@ def search_discogs(artist: str, title: str, limit: int = 5) -> List[Dict[str, An
         query = f"{artist} {title}"
         logger.info(f"Searching Discogs: {query}")
         
-        results = d.search(query, type='release')
+        results = d.search(query, type='release', format = format if format else None)
         releases = []
         
         for idx, result in enumerate(results):
@@ -84,8 +84,6 @@ def search_discogs(artist: str, title: str, limit: int = 5) -> List[Dict[str, An
             
             try:
                 time.sleep(0.1)  # Be kind to the API
-                if results.formats:
-                    print(f'{results.formats}')
                 release_data = {
                     "id": result.id,
                     "title": result.title,
@@ -94,7 +92,7 @@ def search_discogs(artist: str, title: str, limit: int = 5) -> List[Dict[str, An
                     "genres": result.genres or [],
                     "styles": result.styles or [],
                     "country": result.country or "Unknown",
-                    "formats": [fmt for fmt in result.formats] if result.formats else [],
+                    "formats": [fmt.get("name", "") for fmt in result.formats] if result.formats else [],
                 }
                 releases.append(release_data)
             except Exception as e:
@@ -158,6 +156,7 @@ def fetch_discogs_data(record: Dict[str, Any], match_threshold: float = 0.7) -> 
             # Bonus: CD format (prefer CDs over vinyl, cassette, etc.)
             format_bonus = 0.0
             formats = release.get("formats", [])
+            # fmt may be a dict
             if any("cd" in fmt.lower() for fmt in formats):
                 format_bonus = 0.1
             
@@ -191,9 +190,9 @@ def fetch_discogs_data(record: Dict[str, Any], match_threshold: float = 0.7) -> 
         enriched = record.copy()
         enriched.update({
             "genre": " / ".join(best_match.get("genres", [])) or enriched.get("genre"),
-            "style": " / ".join(best_match.get("styles", [])) or enriched.get("style"),
+            "styles": best_match.get("styles", []) or enriched.get("styles", []),
             "discogs_id": best_match.get("id"),
-            "formats": " / ".join(best_match.get("formats", [])) or enriched.get("formats"),
+            "formats": best_match.get("formats", []) or enriched.get("formats", []),
             "country": best_match.get("country") or enriched.get("country"),
         })
         

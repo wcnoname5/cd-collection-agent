@@ -173,7 +173,8 @@ with tab2:
         if search_button:
             try:
                 db = get_db()
-                cd = cd_service.get_cd_by_id(db, int(search_value))
+                # TODO:
+                cd = get_cd_by_id(db, int(search_value))
                 db.close()
                 
                 if cd:
@@ -314,7 +315,7 @@ with tab3:
                                 year=result.get('year'),
                                 genre=" / ".join(result.get('genres', [])) if result.get('genres') else None,
                                 style=" / ".join(result.get('styles', [])) if result.get('styles') else None,
-                                formats=" / ".join(result.get('formats', [])) if result.get('formats') else None,
+                                format=" / ".join(result.get('formats', [])) if result.get('formats') else None,
                                 discogs_id=str(result.get('id'))
                             )
 
